@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Costa Verde — Kota Panas, Jalan Panas</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #0b1c2c; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas.game { display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,.7); user-select: none; }
+  .panel { background: rgba(8, 20, 32, .55); border: 1px solid rgba(255,255,255,.18);
+    border-radius: 10px; padding: 8px 12px; backdrop-filter: blur(2px); }
+  #stars { position: absolute; top: 12px; right: 12px; font-size: 26px; letter-spacing: 4px;
+    color: #ffd23e; }
+  #stars .off { color: rgba(255,255,255,.28); }
+  #money { position: absolute; top: 52px; right: 12px; font-size: 22px; font-weight: 700;
+    color: #7dff9a; }
+  #health { position: absolute; top: 88px; right: 12px; width: 170px; }
+  #health .bar { height: 10px; background: rgba(255,255,255,.25); border-radius: 5px; overflow: hidden; }
+  #health .fill { height: 100%; width: 100%; background: linear-gradient(90deg,#ff5a5a,#ffb03a); }
+  #health .lbl { font-size: 11px; letter-spacing: 2px; opacity: .85; margin-top: 3px; }
+  #speed { position: absolute; bottom: 16px; right: 16px; text-align: right; }
+  #speed .num { font-size: 44px; font-weight: 800; line-height: 1; }
+  #speed .unit { font-size: 12px; letter-spacing: 3px; opacity: .8; }
+  #objective { position: absolute; top: 12px; left: 12px; max-width: 340px; }
+  #objective h2 { margin: 0 0 4px; font-size: 15px; color: #ffd23e; letter-spacing: 1px; }
+  #objective p { margin: 0; font-size: 13px; line-height: 1.45; }
+  #minimap { position: absolute; left: 12px; bottom: 12px; border-radius: 10px;
+    border: 2px solid rgba(255,255,255,.35); background: #0e2a3a; }
+  #toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
+    font-size: 26px; font-weight: 800; text-align: center; color: #ffd23e;
+    opacity: 0; transition: opacity .3s; white-space: nowrap; }
+  #toast small { display: block; font-size: 15px; color: #fff; font-weight: 600; }
+  #hint { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; background: rgba(8,20,32,.6); padding: 6px 12px; border-radius: 8px; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(255,0,0,.45) 100%); }
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(160deg, rgba(6,26,44,.88), rgba(120,40,10,.72));
+    color: #fff; z-index: 10; text-align: center; }
+  .overlay.hidden { display: none; }
+  .card { max-width: 640px; padding: 28px 34px; background: rgba(5,18,30,.72);
+    border: 1px solid rgba(255,210,62,.5); border-radius: 16px; }
+  .card h1 { margin: 0; font-size: 52px; letter-spacing: 2px; color: #ffd23e; line-height: 1; }
+  .card h1 span { color: #4de3ff; }
+  .card h3 { margin: 6px 0 14px; font-weight: 600; letter-spacing: 4px; color: #ffb03a; }
+  .card p { font-size: 14px; line-height: 1.6; color: #e8f2f8; }
+  .card .keys { font-size: 13px; line-height: 1.9; background: rgba(255,255,255,.07);
+    border-radius: 8px; padding: 10px; margin: 12px 0; }
+  .card .keys b { color: #ffd23e; }
+  .btn { pointer-events: auto; cursor: pointer; display: inline-block; margin-top: 8px;
+    background: #ffd23e; color: #122; border: none; border-radius: 10px;
+    font-size: 18px; font-weight: 800; padding: 12px 34px; letter-spacing: 1px; }
+  .btn:hover { background: #ffe27a; }
+  .btn.ghost { background: transparent; color: #fff; border: 1px solid #fff; font-size: 14px; padding: 8px 18px; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 18px; z-index: 20; background: #0b1c2c; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="loading">Memuat Costa Verde…</div>
+<div id="hud" style="display:none">
+  <div id="objective" class="panel"><h2 id="obj-title">COSTA VERDE</h2><p id="obj-text">Selamat datang.</p></div>
+  <div id="stars"></div>
+  <div id="money" class="panel">$0</div>
+  <div id="health" class="panel"><div class="bar"><div class="fill" id="health-fill"></div></div><div class="lbl">NYAWA</div></div>
+  <div id="speed"><div class="num" id="speed-num">0</div><div class="unit">KM/JAM</div></div>
+  <canvas id="minimap" width="180" height="180"></canvas>
+  <div id="toast"></div>
+  <div id="hint">WASD jalan / mengemudi &nbsp;·&nbsp; E masuk &amp; keluar mobil &nbsp;·&nbsp; F pukul &nbsp;·&nbsp; Spasi rem tangan &nbsp;·&nbsp; P jeda &nbsp;·&nbsp; M suara</div>
+</div>
+<div id="vignette"></div>
+
+<div id="start-screen" class="overlay">
+  <div class="card">
+    <h1>COSTA <span>VERDE</span></h1>
+    <h3>KOTA PANAS &middot; JALAN PANAS</h3>
+    <p>Kota pantai yang tak pernah tidur. <b>Dana Cruz</b>, kurir lepas berutang pada
+    <b>Marco Vela</b>, bos pelabuhan, harus menyelesaikan tiga pekerjaan berbahaya
+    sebelum matahari terbenam — atau kotanya yang menelannya. Jelajahi kota dengan
+    berjalan kaki atau di balik kemudi, hindari patroli, dan jangan sampai ketahuan.</p>
+    <div class="keys">
+      <b>W A S D</b> bergerak / mengemudi &nbsp;·&nbsp; <b>Shift</b> lari<br>
+      <b>E</b> masuk / keluar mobil &nbsp;·&nbsp; <b>F</b> pukul &nbsp;·&nbsp; <b>Spasi</b> rem tangan<br>
+      <b>P / Esc</b> jeda &nbsp;·&nbsp; <b>M</b> suara &nbsp;·&nbsp; seret mouse untuk memutar kamera
+    </div>
+    <button class="btn" id="btn-start">▶ &nbsp;MULAI BERMAIN</button><br>
+    <button class="btn ghost" id="btn-continue">Lanjutkan simpanan</button>
+    <p style="font-size:12px;opacity:.75">Kota, karakter, dan cerita orisinal. Bukan tiruan game komersial apa pun.</p>
+  </div>
+</div>
+
+<div id="pause-screen" class="overlay hidden">
+  <div class="card">
+    <h1 style="font-size:38px">JEDA</h1>
+    <p id="pause-stats">—</p>
+    <button class="btn" id="btn-resume">Lanjutkan</button><br>
+    <button class="btn ghost" id="btn-restart">Mulai ulang cerita</button>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
